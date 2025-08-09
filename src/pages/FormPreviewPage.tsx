@@ -34,7 +34,11 @@ const FormPreviewPage: React.FC = () => {
 
   // Use useMemo to prevent re-finding the form on every render
   const form = useMemo(
-    () => savedForms.find((f) => f.id === formId),
+    () =>
+      savedForms.find(
+        (f: { id: string; name: string; fields: FormField[] }) =>
+          f.id === formId
+      ),
     [savedForms, formId]
   );
 
@@ -59,9 +63,9 @@ const FormPreviewPage: React.FC = () => {
   }, [form]);
 
   // Memoize derived fields to avoid recalculating on every render
-  const derivedFields = useMemo(() => {
+  const derivedFields = useMemo<FormField[]>(() => {
     if (!form) return [];
-    return form.fields.filter((field) => field.isDerived);
+    return form.fields.filter((field: FormField) => field.isDerived);
   }, [form]);
 
   // FIX: Major performance improvement.
@@ -69,7 +73,7 @@ const FormPreviewPage: React.FC = () => {
   useEffect(() => {
     if (!form || derivedFields.length === 0) return;
 
-    let derivedDataUpdates: FormData = {};
+    const derivedDataUpdates: FormData = {};
 
     derivedFields.forEach((field) => {
       // Ensure parentFieldIds exists and is an array
@@ -82,7 +86,7 @@ const FormPreviewPage: React.FC = () => {
       // Prevent calculation if any parent value is missing (unless intended)
       if (parentValues.some((v) => v === undefined || v === "")) return;
 
-      let newValue: any = formData[field.id];
+      let newValue = formData[field.id];
 
       // --- Scalable Formula Logic ---
       // FIX: Replaced hardcoded 'calculateAge' with a more scalable structure.
@@ -118,7 +122,7 @@ const FormPreviewPage: React.FC = () => {
     // The dependency array now correctly watches only the relevant parent field values.
   }, [formData, derivedFields, form]);
 
-  const validateField = useCallback((field: FormField, value: any): string => {
+  const validateField = useCallback((field: FormField, value: string | number | boolean | undefined): string => {
     let error = "";
     const val = String(value ?? ""); // Ensure value is a string for length checks
 
@@ -140,8 +144,8 @@ const FormPreviewPage: React.FC = () => {
     }
     if (
       field.validations?.isEmail &&
-      value &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+      val &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
     ) {
       error = `${field.label} must be a valid email address.`;
     }
@@ -150,9 +154,9 @@ const FormPreviewPage: React.FC = () => {
   }, []);
 
   const handleInputChange = useCallback(
-    (fieldId: string, value: any) => {
+    (fieldId: string, value: string | number | boolean) => {
       setFormData((prevData) => ({ ...prevData, [fieldId]: value }));
-      const field = form?.fields.find((f) => f.id === fieldId);
+      const field = form?.fields.find((f: FormField) => f.id === fieldId);
       if (field) {
         const error = validateField(field, value);
         setFormErrors((prevErrors) => ({ ...prevErrors, [fieldId]: error }));
@@ -319,12 +323,16 @@ const FormPreviewPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box
+      width="100%"
+      height="100vh"
+      sx={{ p: 3 }}
+    >
       <Typography variant="h4" gutterBottom>
         Preview: {form.name}
       </Typography>
       <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 3 }}>
-        {form.fields.map((field) => renderField(field))}
+        {form.fields.map((field: FormField) => renderField(field))}
         <Button
           type="submit"
           variant="contained"

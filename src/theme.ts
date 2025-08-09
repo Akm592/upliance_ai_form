@@ -1,6 +1,6 @@
-import { createTheme, alpha } from "@mui/material/styles";
+import { createTheme, alpha, responsiveFontSizes } from "@mui/material/styles";
 
-export const theme = createTheme({
+let theme = createTheme({
   palette: {
     mode: "light",
     primary: {
@@ -34,6 +34,10 @@ export const theme = createTheme({
         body: {
           background: `linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)`,
           minHeight: "100vh",
+          margin: 0,
+        },
+        "*": {
+          boxSizing: "border-box",
         },
       },
     },
@@ -66,3 +70,8 @@ export const theme = createTheme({
     },
   },
 });
+
+// Make typography responsive
+theme = responsiveFontSizes(theme);
+
+export { theme };

@@ -4,7 +4,6 @@ import {
   Box,
   Typography,
   Paper,
-  Grid,
   Stack,
   Button,
   Container,
@@ -13,7 +12,10 @@ import {
   CardActions,
   Chip,
   Divider,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
+import Grid from "@mui/material/Grid"; // ✅ Import directly
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
@@ -23,17 +25,24 @@ import type { FormSchema } from "../types";
 
 const MyFormsPage: React.FC = () => {
   const savedForms = useAppSelector((state) => state.formBuilder.savedForms);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   return (
     <Box
       sx={{
         minHeight: "100vh",
-
         bgcolor: "grey.50",
         py: { xs: 2, sm: 3, md: 4 },
       }}
     >
-      <Container sx={{ px: { xs: 2, sm: 4, md: 6 } }}>
+      <Container
+        maxWidth={false}
+        sx={{
+          px: { xs: 2, sm: 4, md: 6, lg: 8 },
+          width: "100%",
+        }}
+      >
         {/* Header */}
         <Paper
           elevation={0}
@@ -72,16 +81,17 @@ const MyFormsPage: React.FC = () => {
             component={Link}
             to="/create"
             startIcon={<AddCircleOutlineIcon />}
-            size="large"
+            size={isMobile ? "medium" : "large"}
             sx={{
               borderRadius: 2,
-              px: 3,
+              px: { xs: 2, sm: 3 },
               py: 1.5,
               textTransform: "none",
               fontWeight: "bold",
               boxShadow: 2,
               "&:hover": { boxShadow: 4, transform: "translateY(-2px)" },
               transition: "all 0.2s ease",
+              width: { xs: "100%", sm: "auto" },
             }}
           >
             Create New Form
@@ -100,14 +110,14 @@ const MyFormsPage: React.FC = () => {
               bgcolor: "background.paper",
               textAlign: "center",
               borderRadius: 3,
-              p: { xs: 4, md: 6 },
+              p: { xs: 3, md: 6 },
               boxShadow: 1,
             }}
           >
             <Box
               sx={{
-                width: 120,
-                height: 120,
+                width: 100,
+                height: 100,
                 borderRadius: "50%",
                 bgcolor: "primary.50",
                 display: "flex",
@@ -116,7 +126,7 @@ const MyFormsPage: React.FC = () => {
                 mb: 3,
               }}
             >
-              <DescriptionIcon sx={{ fontSize: 60, color: "primary.main" }} />
+              <DescriptionIcon sx={{ fontSize: 50, color: "primary.main" }} />
             </Box>
             <Typography
               variant="h4"
@@ -143,17 +153,18 @@ const MyFormsPage: React.FC = () => {
               component={Link}
               to="/create"
               startIcon={<AddCircleOutlineIcon />}
-              size="large"
+              size={isMobile ? "medium" : "large"}
               sx={{
                 borderRadius: 2,
-                px: 4,
+                px: { xs: 3, sm: 4 },
                 py: 1.5,
                 textTransform: "none",
                 fontWeight: "bold",
-                fontSize: "1.1rem",
+                fontSize: "1.05rem",
                 boxShadow: 2,
                 "&:hover": { boxShadow: 4, transform: "translateY(-1px)" },
                 transition: "all 0.2s ease",
+                width: { xs: "100%", sm: "auto" },
               }}
             >
               Create Your First Form
@@ -164,7 +175,7 @@ const MyFormsPage: React.FC = () => {
             <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
               {savedForms.length} form{savedForms.length !== 1 ? "s" : ""} found
             </Typography>
-            <Grid container spacing={{ xs: 2, md: 3 }}>
+            <Grid container spacing={{ xs: 2, sm: 3 }}>
               {savedForms.map((form: FormSchema, index: number) => (
                 <Grid
                   item
@@ -182,6 +193,8 @@ const MyFormsPage: React.FC = () => {
                       border: "1px solid",
                       borderColor: "grey.200",
                       transition: "all 0.3s ease",
+                      display: "flex",
+                      flexDirection: "column",
                       "&:hover": {
                         transform: "translateY(-6px)",
                         boxShadow: 4,
@@ -189,7 +202,7 @@ const MyFormsPage: React.FC = () => {
                       },
                     }}
                   >
-                    <CardContent sx={{ p: 3, pb: 1 }}>
+                    <CardContent sx={{ p: 3, pb: 1, flexGrow: 1 }}>
                       <Stack spacing={2}>
                         <Box>
                           <Typography
@@ -239,7 +252,14 @@ const MyFormsPage: React.FC = () => {
                       </Stack>
                     </CardContent>
                     <CardActions sx={{ p: 3, pt: 0 }}>
-                      <Stack direction="row" spacing={1} width="100%">
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        width="100%"
+                        sx={{
+                          flexDirection: { xs: "column", sm: "row" },
+                        }}
+                      >
                         <Button
                           variant="outlined"
                           component={Link}
@@ -251,6 +271,7 @@ const MyFormsPage: React.FC = () => {
                             textTransform: "none",
                             fontWeight: 500,
                             borderRadius: 1.5,
+                            width: { xs: "100%", sm: "auto" },
                           }}
                         >
                           Preview
@@ -266,6 +287,7 @@ const MyFormsPage: React.FC = () => {
                             textTransform: "none",
                             fontWeight: 500,
                             borderRadius: 1.5,
+                            width: { xs: "100%", sm: "auto" },
                           }}
                         >
                           Edit

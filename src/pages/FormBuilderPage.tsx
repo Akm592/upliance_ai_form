@@ -56,7 +56,12 @@ const FormBuilderPage: React.FC = () => {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      dispatch(reorderFields({ activeId: active.id, overId: over.id }));
+      dispatch(
+        reorderFields({
+          activeId: active.id.toString(),
+          overId: over.id!.toString(),
+        })
+      );
     }
   };
 
