@@ -21,7 +21,7 @@ function App() {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // mobile <600px
-  const isLargeScreen = useMediaQuery(theme.breakpoints.up("xl")); // very large screens
+  
 
   useEffect(() => {
     const storedForms = loadFormsFromStorage();
@@ -115,6 +115,7 @@ function App() {
           <Route path="/" element={<MyFormsPage />} />
           <Route path="/myforms" element={<MyFormsPage />} />
           <Route path="/create" element={<FormBuilderPage />} />
+          <Route path="/edit/:formId" element={<FormBuilderPage />} />
           <Route path="/preview/:formId" element={<FormPreviewPage />} />
         </Routes>
       </Container>

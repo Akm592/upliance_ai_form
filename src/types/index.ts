@@ -1,32 +1,46 @@
 // src/types/index.ts
 
 // Defines the kinds of input fields the user can add.
-export type FieldType = 'text' | 'number' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'date';
+export type FieldType =
+  | "text"
+  | "number"
+  | "textarea"
+  | "select"
+  | "radio"
+  | "checkbox"
+  | "date"
+  | "password"
+  | "email";
 
 // Defines the structure for a single field in the form.
 export interface FormField {
-  id: string; // A unique identifier (use UUID), crucial for keys and drag-and-drop.
+  id: string; // Unique identifier (UUID recommended)
   type: FieldType;
   label: string;
   required: boolean;
   defaultValue?: any;
-  options?: string[]; // Only for 'select' and 'radio' field types.
-  validations: {
+
+  // Only for 'select' and 'radio' field types
+  options?: string[];
+
+  // Validation rules
+  validations?: {
     minLength?: number;
     maxLength?: number;
-    isEmail?: boolean;
-    customPassword?: boolean; // e.g., min 8 chars, 1 number
+    isEmail?: boolean; // Email format check
+    mustContainNumber?: boolean; // For password fields
   };
-  // Properties for derived fields.
+
+  // Derived field properties
   isDerived?: boolean;
-  parentFieldIds?: string[]; // IDs of fields this one depends on.
-  formula?: string; // Logic for computation (e.g., 'calculateAge').
+  parentFieldIds?: string[]; // IDs of dependent fields
+  formula?: string; // JS expression for calculation
 }
 
 // Defines the complete schema for a single form.
 export interface FormSchema {
-  id: string; // Unique ID for the form itself.
+  id: string; // Unique form ID
   name: string;
-  createdAt: string; // Store as an ISO string for easy sorting/display.
+  createdAt: string; // ISO date string
   fields: FormField[];
 }

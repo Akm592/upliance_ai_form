@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -14,19 +14,49 @@ import {
   Divider,
   useTheme,
   useMediaQuery,
+  Grid,
+  GridLegacy,
+
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from "@mui/material";
-import Grid from "@mui/material/Grid"; // ✅ Import directly
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import DescriptionIcon from "@mui/icons-material/Description";
-import { useAppSelector } from "../app/hooks";
+import { useAppSelector, useAppDispatch } from "../app/hooks";
+import { deleteForm } from "../features/formBuilder/formBuilderSlice";
 import type { FormSchema } from "../types";
 
 const MyFormsPage: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const savedForms = useAppSelector((state) => state.formBuilder.savedForms);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleDeleteClick = (formId: string) => {
+    setSelectedFormId(formId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (selectedFormId) dispatch(deleteForm(selectedFormId));
+    setSelectedFormId(null);
+    setDeleteDialogOpen(false);
+  };
+
+  const handleDeleteCancel = () => {
+    setSelectedFormId(null);
+    setDeleteDialogOpen(false);
+  };
 
   return (
     <Box
@@ -36,13 +66,7 @@ const MyFormsPage: React.FC = () => {
         py: { xs: 2, sm: 3, md: 4 },
       }}
     >
-      <Container
-        maxWidth={false}
-        sx={{
-          px: { xs: 2, sm: 4, md: 6, lg: 8 },
-          width: "100%",
-        }}
-      >
+      <Container maxWidth="xl">
         {/* Header */}
         <Paper
           elevation={0}
@@ -50,8 +74,7 @@ const MyFormsPage: React.FC = () => {
             mb: { xs: 3, md: 4 },
             p: { xs: 2, sm: 3 },
             borderRadius: 3,
-            background: (theme) =>
-              `linear-gradient(135deg, ${theme.palette.primary.main}10, ${theme.palette.primary.main}05)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.light}20, ${theme.palette.primary.light}05)`,
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
             justifyContent: "space-between",
@@ -98,7 +121,7 @@ const MyFormsPage: React.FC = () => {
           </Button>
         </Paper>
 
-        {/* Content */}
+        {/* Empty State */}
         {savedForms.length === 0 ? (
           <Paper
             sx={{
@@ -107,7 +130,6 @@ const MyFormsPage: React.FC = () => {
               alignItems: "center",
               justifyContent: "center",
               minHeight: "60vh",
-              bgcolor: "background.paper",
               textAlign: "center",
               borderRadius: 3,
               p: { xs: 3, md: 6 },
@@ -116,8 +138,8 @@ const MyFormsPage: React.FC = () => {
           >
             <Box
               sx={{
-                width: 100,
-                height: 100,
+                width: 110,
+                height: 110,
                 borderRadius: "50%",
                 bgcolor: "primary.50",
                 display: "flex",
@@ -126,7 +148,7 @@ const MyFormsPage: React.FC = () => {
                 mb: 3,
               }}
             >
-              <DescriptionIcon sx={{ fontSize: 50, color: "primary.main" }} />
+              <DescriptionIcon sx={{ fontSize: 54, color: "primary.main" }} />
             </Box>
             <Typography
               variant="h4"
@@ -176,15 +198,8 @@ const MyFormsPage: React.FC = () => {
               {savedForms.length} form{savedForms.length !== 1 ? "s" : ""} found
             </Typography>
             <Grid container spacing={{ xs: 2, sm: 3 }}>
-              {savedForms.map((form: FormSchema, index: number) => (
-                <Grid
-                  item
-                  xs={12}
-                  sm={6}
-                  md={4}
-                  lg={3}
-                  key={form.id || `form-${index}`}
-                >
+              {savedForms.map((form: FormSchema) => (
+                <GridLegacy item xs={12} sm={6} md={4} lg={3} key={form.id}>
                   <Card
                     elevation={0}
                     sx={{
@@ -202,7 +217,7 @@ const MyFormsPage: React.FC = () => {
                       },
                     }}
                   >
-                    <CardContent sx={{ p: 3, pb: 1, flexGrow: 1 }}>
+                    <CardContent sx={{ p: 3, flexGrow: 1 }}>
                       <Stack spacing={2}>
                         <Box>
                           <Typography
@@ -251,53 +266,51 @@ const MyFormsPage: React.FC = () => {
                         </Box>
                       </Stack>
                     </CardContent>
-                    <CardActions sx={{ p: 3, pt: 0 }}>
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        width="100%"
-                        sx={{
-                          flexDirection: { xs: "column", sm: "row" },
-                        }}
+                    <CardActions sx={{ justifyContent: "space-between", p: 2 }}>
+                      <Button
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => navigate(`/preview/${form.id}`)}
                       >
-                        <Button
-                          variant="outlined"
-                          component={Link}
-                          to={`/preview/${form.id}`}
-                          startIcon={<VisibilityIcon />}
-                          size="small"
-                          sx={{
-                            flex: 1,
-                            textTransform: "none",
-                            fontWeight: 500,
-                            borderRadius: 1.5,
-                            width: { xs: "100%", sm: "auto" },
-                          }}
-                        >
-                          Preview
-                        </Button>
-                        <Button
-                          variant="contained"
-                          component={Link}
-                          to={`/edit/${form.id}`}
-                          startIcon={<EditIcon />}
-                          size="small"
-                          sx={{
-                            flex: 1,
-                            textTransform: "none",
-                            fontWeight: 500,
-                            borderRadius: 1.5,
-                            width: { xs: "100%", sm: "auto" },
-                          }}
-                        >
-                          Edit
-                        </Button>
-                      </Stack>
+                        Preview
+                      </Button>
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => navigate(`/edit/${form.id}`)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => handleDeleteClick(form.id)}
+                      >
+                        Delete
+                      </Button>
                     </CardActions>
                   </Card>
-                </Grid>
+                </GridLegacy>
               ))}
             </Grid>
+
+            {/* Delete Confirmation */}
+            <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+              <DialogTitle>Delete Form</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  Are you sure you want to delete this form? This action cannot
+                  be undone.
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={handleDeleteCancel}>Cancel</Button>
+                <Button onClick={handleDeleteConfirm} color="error">
+                  Delete
+                </Button>
+              </DialogActions>
+            </Dialog>
           </>
         )}
       </Container>

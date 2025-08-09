@@ -1,61 +1,36 @@
-// src/components/FieldConfigPanel.tsx
-import React from 'react';
-import { Box, Typography, TextField, FormControlLabel, Switch, Select, MenuItem, InputLabel, FormControl, Chip, OutlinedInput } from '@mui/material'; // Removed Button
-import { useAppSelector, useAppDispatch } from '../app/hooks';
-import { updateField, setSelectedField } from '../features/formBuilder/formBuilderSlice';
-import type { FormField, FieldType } from '../types'; // Use type import
+import React from "react";
+import {
+  Box,
+  Typography,
+  TextField,
+  FormControlLabel,
+  Switch,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Chip,
+  OutlinedInput,
+} from "@mui/material";
+import { useAppSelector, useAppDispatch } from "../app/hooks";
+import { updateField } from "../features/formBuilder/formBuilderSlice";
+import type { FormField} from "../types";
 
 const FieldConfigPanel: React.FC = () => {
   const dispatch = useAppDispatch();
-  const selectedFieldId = useAppSelector((state) => state.formBuilder.selectedFieldId);
+  const selectedFieldId = useAppSelector(
+    (state) => state.formBuilder.selectedFieldId
+  );
   const currentForm = useAppSelector((state) => state.formBuilder.currentForm);
 
   const selectedField = selectedFieldId
-    ? currentForm.fields.find((field: FormField) => field.id === selectedFieldId) // Explicitly type field
+    ? currentForm.fields.find((field) => field.id === selectedFieldId)
     : null;
 
   const handleUpdateField = (updates: Partial<FormField>) => {
     if (selectedFieldId) {
       dispatch(updateField({ fieldId: selectedFieldId, updates }));
     }
-  };
-
-  const handleLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUpdateField({ label: e.target.value });
-  };
-
-  const handleRequiredChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUpdateField({ required: e.target.checked });
-  };
-
-  const handleMinLengthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUpdateField({ validations: { ...selectedField?.validations, minLength: Number(e.target.value) } });
-  };
-
-  const handleMaxLengthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUpdateField({ validations: { ...selectedField?.validations, maxLength: Number(e.target.value) } });
-  };
-
-  const handleOptionsChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | { name?: string; value: unknown; }>) => {
-    const { value } = event.target;
-    handleUpdateField({
-      options: typeof value === 'string' ? value.split(',') : value as string[],
-    });
-  };
-
-  const handleIsDerivedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUpdateField({ isDerived: e.target.checked });
-  };
-
-  const handleParentFieldIdsChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | { name?: string; value: unknown; }>) => {
-    const { value } = event.target;
-    handleUpdateField({
-      parentFieldIds: typeof value === 'string' ? value.split(',') : value as string[],
-    });
-  };
-
-  const handleFormulaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUpdateField({ formula: e.target.value });
   };
 
   if (!selectedField) {
@@ -68,93 +43,204 @@ const FieldConfigPanel: React.FC = () => {
     );
   }
 
-  const availableParentFields = currentForm.fields.filter((f: FormField) => f.id !== selectedField.id); // Explicitly type f
+  const availableParentFields = currentForm.fields.filter(
+    (f) => f.id !== selectedField.id
+  );
 
   return (
     <Box sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>Field: {selectedField.label}</Typography>
-      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Type: {selectedField.type}</Typography>
+      <Typography variant="h6" gutterBottom>
+        Field: {selectedField.label || "(No label)"}
+      </Typography>
+      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+        Type: {selectedField.type}
+      </Typography>
 
+      {/* Label */}
       <TextField
         label="Label"
         value={selectedField.label}
-        onChange={handleLabelChange}
+        onChange={(e) => handleUpdateField({ label: e.target.value })}
         fullWidth
         margin="normal"
       />
 
+      {/* Required */}
       <FormControlLabel
         control={
           <Switch
-            checked={selectedField.required}
-            onChange={handleRequiredChange}
-            name="required"
+            checked={selectedField.required || false}
+            onChange={(e) => handleUpdateField({ required: e.target.checked })}
           />
         }
         label="Required"
       />
 
-      {(selectedField.type === 'text' || selectedField.type === 'textarea') && (
+      {/* Default Value */}
+      <TextField
+        label="Default Value"
+        value={selectedField.defaultValue || ""}
+        onChange={(e) => handleUpdateField({ defaultValue: e.target.value })}
+        fullWidth
+        margin="normal"
+      />
+
+      {/* Validation Rules */}
+      {(selectedField.type === "text" ||
+        selectedField.type === "textarea" ||
+        selectedField.type === "number" ||
+        selectedField.type === "password" ||
+        selectedField.type === "email") && (
         <Box sx={{ mt: 2 }}>
           <Typography variant="subtitle1">Validations</Typography>
-          <TextField
-            label="Min Length"
-            type="number"
-            value={selectedField.validations?.minLength || ''}
-            onChange={handleMinLengthChange}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Max Length"
-            type="number"
-            value={selectedField.validations?.maxLength || ''}
-            onChange={handleMaxLengthChange}
-            fullWidth
-            margin="normal"
-          />
+          {(selectedField.type === "text" ||
+            selectedField.type === "textarea" ||
+            selectedField.type === "password") && (
+            <>
+              <TextField
+                label="Min Length"
+                type="number"
+                value={selectedField.validations?.minLength || ""}
+                onChange={(e) =>
+                  handleUpdateField({
+                    validations: {
+                      ...selectedField.validations,
+                      minLength: Number(e.target.value) || undefined,
+                    },
+                  })
+                }
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="Max Length"
+                type="number"
+                value={selectedField.validations?.maxLength || ""}
+                onChange={(e) =>
+                  handleUpdateField({
+                    validations: {
+                      ...selectedField.validations,
+                      maxLength: Number(e.target.value) || undefined,
+                    },
+                  })
+                }
+                fullWidth
+                margin="normal"
+              />
+            </>
+          )}
+
+          {selectedField.type === "email" && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={selectedField.validations?.isEmail || false}
+                  onChange={(e) =>
+                    handleUpdateField({
+                      validations: {
+                        ...selectedField.validations,
+                        isEmail: e.target.checked,
+                      },
+                    })
+                  }
+                />
+              }
+              label="Must be a valid email address"
+            />
+          )}
+
+          {selectedField.type === "password" && (
+            <>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={
+                      selectedField.validations?.mustContainNumber || false
+                    }
+                    onChange={(e) =>
+                      handleUpdateField({
+                        validations: {
+                          ...selectedField.validations,
+                          mustContainNumber: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                }
+                label="Must contain a number"
+              />
+              <TextField
+                label="Min Password Length"
+                type="number"
+                value={selectedField.validations?.minLength || ""}
+                onChange={(e) =>
+                  handleUpdateField({
+                    validations: {
+                      ...selectedField.validations,
+                      minLength: Number(e.target.value) || undefined,
+                    },
+                  })
+                }
+                fullWidth
+                margin="normal"
+              />
+            </>
+          )}
         </Box>
       )}
 
-      {(selectedField.type === 'select' || selectedField.type === 'radio') && (
+      {/* Options for Select/Radio */}
+      {(selectedField.type === "select" || selectedField.type === "radio") && (
         <FormControl fullWidth margin="normal">
           <InputLabel id="options-label">Options</InputLabel>
           <Select
             labelId="options-label"
             multiple
             value={selectedField.options || []}
-            onChange={handleOptionsChange}
+            onChange={(e) =>
+              handleUpdateField({
+                options:
+                  typeof e.target.value === "string"
+                    ? e.target.value.split(",")
+                    : (e.target.value as string[]),
+              })
+            }
             input={<OutlinedInput id="select-multiple-chip" label="Options" />}
             renderValue={(selected) => (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                 {(selected as string[]).map((value) => (
                   <Chip key={value} label={value} />
                 ))}
               </Box>
             )}
           >
-            {/* For now, let's assume options are manually entered as comma-separated string */}
-            {/* In a real app, you might have a more sophisticated way to add/edit options */}
-            <MenuItem disabled value="">Enter options as comma-separated values in the text field below</MenuItem>
+            <MenuItem disabled value="">
+              Enter options below as comma-separated
+            </MenuItem>
           </Select>
           <TextField
             label="Enter Options (comma-separated)"
-            value={selectedField.options?.join(',') || ''}
-            onChange={handleOptionsChange}
+            value={selectedField.options?.join(",") || ""}
+            onChange={(e) =>
+              handleUpdateField({
+                options: e.target.value.split(",").map((opt) => opt.trim()),
+              })
+            }
             fullWidth
             margin="normal"
-            helperText="e.g., Option1,Option2,Option3"
           />
         </FormControl>
       )}
 
+      {/* Derived Field Settings */}
       <Box sx={{ mt: 3 }}>
         <FormControlLabel
           control={
             <Switch
               checked={selectedField.isDerived || false}
-              onChange={handleIsDerivedChange}
-              name="isDerived"
+              onChange={(e) =>
+                handleUpdateField({ isDerived: e.target.checked })
+              }
             />
           }
           label="Is Derived Field"
@@ -162,23 +248,41 @@ const FieldConfigPanel: React.FC = () => {
         {selectedField.isDerived && (
           <Box>
             <FormControl fullWidth margin="normal">
-              <InputLabel id="parent-fields-label">Depends on Fields</InputLabel>
+              <InputLabel id="parent-fields-label">
+                Depends on Fields
+              </InputLabel>
               <Select
                 labelId="parent-fields-label"
                 multiple
                 value={selectedField.parentFieldIds || []}
-                onChange={handleParentFieldIdsChange}
-                input={<OutlinedInput id="select-multiple-parent-chip" label="Depends on Fields" />}
+                onChange={(e) =>
+                  handleUpdateField({
+                    parentFieldIds:
+                      typeof e.target.value === "string"
+                        ? e.target.value.split(",")
+                        : (e.target.value as string[]),
+                  })
+                }
+                input={
+                  <OutlinedInput
+                    id="select-multiple-parent-chip"
+                    label="Depends on Fields"
+                  />
+                }
                 renderValue={(selected) => (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                     {(selected as string[]).map((fieldId) => {
-                      const field = currentForm.fields.find((f: FormField) => f.id === fieldId);
-                      return <Chip key={fieldId} label={field?.label || fieldId} />;
+                      const field = currentForm.fields.find(
+                        (f) => f.id === fieldId
+                      );
+                      return (
+                        <Chip key={fieldId} label={field?.label || fieldId} />
+                      );
                     })}
                   </Box>
                 )}
               >
-                {availableParentFields.map((field: FormField) => ( // Explicitly type field
+                {availableParentFields.map((field) => (
                   <MenuItem key={field.id} value={field.id}>
                     {field.label} ({field.type})
                   </MenuItem>
@@ -186,12 +290,12 @@ const FieldConfigPanel: React.FC = () => {
               </Select>
             </FormControl>
             <TextField
-              label="Formula (e.g., calculateAge)"
-              value={selectedField.formula || ''}
-              onChange={handleFormulaChange}
+              label="Formula (JavaScript Expression)"
+              value={selectedField.formula || ""}
+              onChange={(e) => handleUpdateField({ formula: e.target.value })}
               fullWidth
               margin="normal"
-              helperText="Define the logic for this derived field."
+              helperText="Use parent field values to compute this field's value."
             />
           </Box>
         )}

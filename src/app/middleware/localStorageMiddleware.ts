@@ -1,21 +1,23 @@
 // src/app/middleware/localStorageMiddleware.ts
-import type { Middleware } from 'redux'; // Use type import
-import type { RootState } from '../store'; // Use type import
+import type { Middleware, Action } from '@reduxjs/toolkit';
 import { saveFormsToStorage } from '../../services/storage';
-import { saveCurrentForm, loadForms } from '../../features/formBuilder/formBuilderSlice';
-import type { AnyAction } from '@reduxjs/toolkit'; // Use type import for AnyAction
+import type { FormSchema } from '../../types';
 
-export const localStorageMiddleware: Middleware<{}, RootState> =
-  ({ getState }) =>
-  (next) =>
-  (action: AnyAction) => { // Explicitly type action
-    const result = next(action);
-
-    // Only save to localStorage if the action is one that modifies savedForms
-    if (action.type === saveCurrentForm.type || action.type === loadForms.type) {
-      const savedForms = getState().formBuilder.savedForms;
-      saveFormsToStorage(savedForms);
-    }
-
-    return result;
+interface RootState {
+  formBuilder: {
+    savedForms: FormSchema[];
   };
+}
+
+function isAction(action: unknown): action is Action {
+  return typeof action === 'object' && action !== null && 'type' in action;
+}
+
+export const localStorageMiddleware: Middleware = store => next => (action: unknown) => {
+  const result = next(action);
+  if (isAction(action) && action.type.startsWith('formBuilder/')) {
+    const { savedForms } = (store.getState() as RootState).formBuilder;
+    saveFormsToStorage(savedForms);
+  }
+  return result;
+};

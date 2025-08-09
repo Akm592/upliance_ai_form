@@ -1,8 +1,9 @@
 // src/pages/FormBuilderPage.tsx
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import {
   Box,
-  Grid,
+  GridLegacy,
   Typography,
   Button,
   Dialog,
@@ -11,7 +12,6 @@ import {
   DialogContentText,
   DialogTitle,
   TextField,
-  Stack,
   Paper,
 } from "@mui/material";
 import {
@@ -21,14 +21,24 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type DragEndEvent,
 } from "@dnd-kit/core";
-import type { DragEndEvent } from "@dnd-kit/core";
-
 import {
-  SortableContext,
+  SortableContext as DndSortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import type { SortingStrategy } from "@dnd-kit/sortable";
+import type { UniqueIdentifier } from "@dnd-kit/core";
 
+// Workaround to satisfy TS that SortableContext returns ReactNode
+const SortableContext = (DndSortableContext as unknown) as React.FC<
+  React.PropsWithChildren<{
+    items: UniqueIdentifier[];
+    strategy: SortingStrategy;
+    disabled?: boolean;
+    id?: string;
+  }>
+>;
 
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import {
@@ -36,56 +46,70 @@ import {
   addField,
   setCurrentFormName,
   saveCurrentForm,
+  loadFormForEdit,
+  resetCurrentForm,
 } from "../features/formBuilder/formBuilderSlice";
 import type { FieldType } from "../types";
+
 import SortableFormField from "../components/SortableFormField";
 import FieldConfigPanel from "../components/FieldConfigPanel";
+import FieldToolbar from "../components/FieldToolbar";
 
 const FormBuilderPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const { formId } = useParams<{ formId: string }>();
   const currentForm = useAppSelector((state) => state.formBuilder.currentForm);
 
   const [openSaveDialog, setOpenSaveDialog] = useState(false);
   const [formNameInput, setFormNameInput] = useState(currentForm.name);
+
+  useEffect(() => {
+    if (formId) {
+      dispatch(loadFormForEdit(formId));
+    } else {
+      dispatch(resetCurrentForm());
+    }
+  }, [dispatch, formId]);
+
+  useEffect(() => {
+    setFormNameInput(currentForm.name);
+  }, [currentForm.name]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor)
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      dispatch(
-        reorderFields({
-          activeId: active.id.toString(),
-          overId: over.id!.toString(),
-        })
-      );
-    }
-  };
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        dispatch(
+          reorderFields({
+            activeId: active.id.toString(),
+            overId: over.id!.toString(),
+          })
+        );
+      }
+    },
+    [dispatch]
+  );
 
-  const handleAddField = (type: FieldType) => {
-    dispatch(addField({ type }));
-  };
+  const handleAddField = useCallback(
+    (type: FieldType) => {
+      dispatch(addField({ type }));
+    },
+    [dispatch]
+  );
 
-  const handleOpenSaveDialog = () => {
-    setFormNameInput(currentForm.name);
-    setOpenSaveDialog(true);
-  };
-
-  const handleCloseSaveDialog = () => {
-    setOpenSaveDialog(false);
-  };
-
-  const handleSaveForm = () => {
-    dispatch(setCurrentFormName(formNameInput));
+  const handleSaveForm = useCallback(() => {
+    dispatch(setCurrentFormName(formNameInput.trim()));
     dispatch(saveCurrentForm());
-    handleCloseSaveDialog();
-  };
+    setOpenSaveDialog(false);
+  }, [dispatch, formNameInput]);
 
   return (
-    <Box sx={{ flexGrow: 1, p: 3 }}>
+    <Box sx={{ flexGrow: 1, p: 3, height: "100vh" }}>
       {/* Header */}
       <Box
         sx={{
@@ -95,64 +119,28 @@ const FormBuilderPage: React.FC = () => {
           mb: 2,
         }}
       >
-        <Typography variant="h4" gutterBottom>
-          {currentForm.name}
+        <Typography variant="h4">
+          {currentForm.name || "Untitled Form"}
         </Typography>
         <Button
           variant="contained"
-          color="primary"
-          onClick={handleOpenSaveDialog}
+          onClick={() => {
+            setFormNameInput(currentForm.name);
+            setOpenSaveDialog(true);
+          }}
         >
           Save Form
         </Button>
       </Box>
 
-      <Grid container spacing={3}>
-        {/* Left Column: Form Canvas */}
-        <Grid item xs={12} md={7}>
-          <Paper sx={{ border: "1px dashed grey", p: 2, minHeight: "400px" }}>
+      <GridLegacy container spacing={3}>
+        {/* Form Canvas */}
+        <GridLegacy item xs={12} md={7}>
+          <Paper sx={{ border: "1px dashed grey", p: 2, minHeight: "70vh" }}>
             <Typography variant="h6" gutterBottom>
               Form Fields
             </Typography>
-
-            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap" }}>
-              <Button variant="outlined" onClick={() => handleAddField("text")}>
-                Add Text
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleAddField("number")}
-              >
-                Add Number
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleAddField("textarea")}
-              >
-                Add Textarea
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleAddField("select")}
-              >
-                Add Select
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleAddField("radio")}
-              >
-                Add Radio
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleAddField("checkbox")}
-              >
-                Add Checkbox
-              </Button>
-              <Button variant="outlined" onClick={() => handleAddField("date")}>
-                Add Date
-              </Button>
-            </Stack>
+            <FieldToolbar onAddField={handleAddField} />
 
             <DndContext
               sensors={sensors}
@@ -160,17 +148,16 @@ const FormBuilderPage: React.FC = () => {
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={currentForm.fields.map((field) => field.id)}
+                items={currentForm.fields.map((f) => f.id)}
                 strategy={verticalListSortingStrategy}
               >
                 {currentForm.fields.length === 0 ? (
                   <Typography
-                    variant="body1"
+                    variant="body2"
                     color="textSecondary"
                     sx={{ p: 2 }}
                   >
-                    Drag and drop fields here, or use the buttons above to add
-                    new fields.
+                    Use the buttons above to add fields or drag them here.
                   </Typography>
                 ) : (
                   currentForm.fields.map((field) => (
@@ -180,32 +167,24 @@ const FormBuilderPage: React.FC = () => {
               </SortableContext>
             </DndContext>
           </Paper>
-        </Grid>
+        </GridLegacy>
 
-        {/* Right Column: Field Configuration Panel */}
-        <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 2, minHeight: "400px" }}>
-            <Typography variant="h6" gutterBottom>
-              Field Configuration
-            </Typography>
+        {/* Config Panel */}
+        <GridLegacy   item xs={12} md={5}>
+          <Paper sx={{ p: 2, minHeight: "70vh" }}>
+            <Typography variant="h6">Field Configuration</Typography>
             <FieldConfigPanel />
           </Paper>
-        </Grid>
-      </Grid>
+        </GridLegacy>
+      </GridLegacy>
 
-      {/* Save Form Dialog */}
-      <Dialog open={openSaveDialog} onClose={handleCloseSaveDialog}>
+      {/* Save Dialog */}
+      <Dialog open={openSaveDialog} onClose={() => setOpenSaveDialog(false)}>
         <DialogTitle>Save Form</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            Please enter a name for your form.
-          </DialogContentText>
+          <DialogContentText>Enter a name for your form:</DialogContentText>
           <TextField
             autoFocus
-            margin="dense"
-            id="formName"
-            label="Form Name"
-            type="text"
             fullWidth
             variant="standard"
             value={formNameInput}
@@ -213,7 +192,7 @@ const FormBuilderPage: React.FC = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseSaveDialog}>Cancel</Button>
+          <Button onClick={() => setOpenSaveDialog(false)}>Cancel</Button>
           <Button onClick={handleSaveForm} disabled={!formNameInput.trim()}>
             Save
           </Button>

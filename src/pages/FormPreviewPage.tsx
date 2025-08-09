@@ -1,5 +1,11 @@
-// src/pages/FormPreviewPage.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+
+import type { FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import {
   Box,
@@ -15,181 +21,207 @@ import {
   FormControl,
   Button,
   FormHelperText,
+  Alert,
+  CircularProgress,
+  Divider,
 } from "@mui/material";
 import { useAppSelector } from "../app/hooks";
-import type { FormField } from "../types"; // Use the specific type
+import type { FormField } from "../types";
 
-// Define more specific types for formData and formErrors for better type safety
 interface FormData {
   [key: string]: string | number | boolean | undefined;
 }
-
 interface FormErrors {
   [key: string]: string;
 }
+interface SubmissionStatus {
+  type: "success" | "error";
+  message: string;
+}
+
+const calculateDerivedValue = (
+  formula: string,
+  parentValues: (string | number | boolean | undefined)[]
+) => {
+  if (formula === "calculateAge" && parentValues.length === 1) {
+    const birthDate = new Date(parentValues[0] as string);
+    if (isNaN(birthDate.getTime())) return "";
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age >= 0 ? age : "";
+  }
+  return "";
+};
 
 const FormPreviewPage: React.FC = () => {
   const { formId } = useParams<{ formId: string }>();
   const savedForms = useAppSelector((state) => state.formBuilder.savedForms);
 
-  // Use useMemo to prevent re-finding the form on every render
+  const [formData, setFormData] = useState<FormData>({});
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [submissionStatus, setSubmissionStatus] =
+    useState<SubmissionStatus | null>(null);
+
   const form = useMemo(
-    () =>
-      savedForms.find(
-        (f: { id: string; name: string; fields: FormField[] }) =>
-          f.id === formId
-      ),
+    () => savedForms.find((f) => f.id === formId),
     [savedForms, formId]
   );
 
-  const [formData, setFormData] = useState<FormData>({});
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const parentToDerivedMap = useMemo(() => {
+    const map = new Map<string, FormField[]>();
+    if (!form) return map;
+    form.fields
+      .filter((field) => field.isDerived)
+      .forEach((derivedField) => {
+        derivedField.parentFieldIds?.forEach((parentId) => {
+          const children = map.get(parentId) || [];
+          children.push(derivedField);
+          map.set(parentId, children);
+        });
+      });
+    return map;
+  }, [form]);
 
-  // Effect for initializing form data when the form definition loads
   useEffect(() => {
     if (form) {
+      setIsLoading(true);
       const initialData: FormData = {};
-      form.fields.forEach((field: FormField) => {
-        // FIX: Prioritize defaultValue from form definition for all field types,
-        // then provide a sensible default. Checkbox default is false.
-        if (field.type === "checkbox") {
-          initialData[field.id] = field.defaultValue ?? false;
-        } else {
-          initialData[field.id] = field.defaultValue ?? "";
-        }
+      const initialErrors: FormErrors = {};
+      form.fields.forEach((field) => {
+        initialData[field.id] =
+          field.defaultValue ?? (field.type === "checkbox" ? false : "");
+        initialErrors[field.id] = "";
       });
-      setFormData(initialData);
-    }
-  }, [form]);
-
-  // Memoize derived fields to avoid recalculating on every render
-  const derivedFields = useMemo<FormField[]>(() => {
-    if (!form) return [];
-    return form.fields.filter((field: FormField) => field.isDerived);
-  }, [form]);
-
-  // FIX: Major performance improvement.
-  // This effect now ONLY runs when a parent field of a derived field changes.
-  useEffect(() => {
-    if (!form || derivedFields.length === 0) return;
-
-    const derivedDataUpdates: FormData = {};
-
-    derivedFields.forEach((field) => {
-      // Ensure parentFieldIds exists and is an array
-      if (!field.parentFieldIds || !Array.isArray(field.parentFieldIds)) return;
-
-      const parentValues = field.parentFieldIds.map(
-        (parentId: string) => formData[parentId]
-      );
-
-      // Prevent calculation if any parent value is missing (unless intended)
-      if (parentValues.some((v) => v === undefined || v === "")) return;
-
-      let newValue = formData[field.id];
-
-      // --- Scalable Formula Logic ---
-      // FIX: Replaced hardcoded 'calculateAge' with a more scalable structure.
-      // In a real app, you would use a library like `expr-eval` or a custom interpreter here.
-      if (field.formula === "calculateAge" && parentValues.length === 1) {
-        const birthDate = new Date(parentValues[0] as string);
-        if (!isNaN(birthDate.getTime())) {
-          const today = new Date();
-          let age = today.getFullYear() - birthDate.getFullYear();
-          const m = today.getMonth() - birthDate.getMonth();
-          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
+      form.fields
+        .filter((field) => field.isDerived)
+        .forEach((derivedField) => {
+          if (derivedField.formula && derivedField.parentFieldIds) {
+            const parentValues = derivedField.parentFieldIds.map(
+              (id) => initialData[id]
+            );
+            if (parentValues.every((v) => v !== "" && v !== undefined)) {
+              initialData[derivedField.id] = calculateDerivedValue(
+                derivedField.formula,
+                parentValues
+              );
+            }
           }
-          newValue = age >= 0 ? age : "";
-        }
-      }
-      // Example for another formula:
-      // if (field.formula === 'concat' && parentValues.length > 1) {
-      //   newValue = parentValues.join(' ');
-      // }
-
-      // Only include the update if the value has actually changed
-      if (newValue !== formData[field.id]) {
-        derivedDataUpdates[field.id] = newValue;
-      }
-    });
-
-    // Apply all updates in a single batch state update to prevent multiple re-renders
-    if (Object.keys(derivedDataUpdates).length > 0) {
-      setFormData((prevData) => ({ ...prevData, ...derivedDataUpdates }));
+        });
+      setFormData(initialData);
+      setFormErrors(initialErrors);
+      setIsLoading(false);
     }
+  }, [form]);
 
-    // The dependency array now correctly watches only the relevant parent field values.
-  }, [formData, derivedFields, form]);
-
-  const validateField = useCallback((field: FormField, value: string | number | boolean | undefined): string => {
-    let error = "";
-    const val = String(value ?? ""); // Ensure value is a string for length checks
-
-    if (field.required && !value) {
-      // Check for falsy values like false, 0, ''
+  const validateField = useCallback(
+    (field: FormField, value: string | number | boolean | undefined): string => {
+    if (
+      field.required &&
+      (value === "" || value === false || value === undefined)
+    ) {
       return `${field.label} is required.`;
     }
+    const stringValue = String(value ?? "");
     if (
       field.validations?.minLength &&
-      val.length < field.validations.minLength
+      stringValue.length < field.validations.minLength
     ) {
-      error = `${field.label} must be at least ${field.validations.minLength} characters.`;
+      return `${field.label} must be at least ${field.validations.minLength} characters.`;
     }
     if (
       field.validations?.maxLength &&
-      val.length > field.validations.maxLength
+      stringValue.length > field.validations.maxLength
     ) {
-      error = `${field.label} cannot exceed ${field.validations.maxLength} characters.`;
+      return `${field.label} cannot exceed ${field.validations.maxLength} characters.`;
     }
     if (
       field.validations?.isEmail &&
-      val &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+      stringValue &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(stringValue)
     ) {
-      error = `${field.label} must be a valid email address.`;
+      return `Please enter a valid email address.`;
     }
-    // Add other validations (e.g., customPassword) here
-    return error;
+    return "";
   }, []);
 
   const handleInputChange = useCallback(
-    (fieldId: string, value: string | number | boolean) => {
-      setFormData((prevData) => ({ ...prevData, [fieldId]: value }));
-      const field = form?.fields.find((f: FormField) => f.id === fieldId);
+      (fieldId: string, value: string | number | boolean) => {
+      setSubmissionStatus(null);
+      const newFormData = { ...formData, [fieldId]: value };
+      const derivedChildren = parentToDerivedMap.get(fieldId);
+      if (derivedChildren) {
+        derivedChildren.forEach((child) => {
+          if (child.formula && child.parentFieldIds) {
+            const parentValues = child.parentFieldIds.map(
+              (id) => newFormData[id]
+            );
+            newFormData[child.id] = calculateDerivedValue(
+              child.formula,
+              parentValues
+            );
+          }
+        });
+      }
+      setFormData(newFormData);
+      const field = form?.fields.find((f) => f.id === fieldId);
       if (field) {
-        const error = validateField(field, value);
-        setFormErrors((prevErrors) => ({ ...prevErrors, [fieldId]: error }));
+        setFormErrors((prev) => ({
+          ...prev,
+          [fieldId]: validateField(field, value),
+        }));
       }
     },
-    [form, validateField]
+    [formData, form, parentToDerivedMap, validateField]
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!form) return;
-
     let hasErrors = false;
     const newErrors: FormErrors = {};
-
-    form.fields.forEach((field: FormField) => {
+    form.fields.forEach((field) => {
+      if (field.isDerived) return;
       const error = validateField(field, formData[field.id]);
       if (error) {
         newErrors[field.id] = error;
         hasErrors = true;
       }
     });
-
     setFormErrors(newErrors);
-
     if (!hasErrors) {
       console.log("Form submitted successfully:", formData);
-      alert("Form submitted successfully! Check console for data.");
+      setSubmissionStatus({
+        type: "success",
+        message: "Form submitted successfully!",
+      });
     } else {
-      console.log("Form has errors:", newErrors);
-      alert("Please correct the errors in the form.");
+      setSubmissionStatus({
+        type: "error",
+        message: "Please correct the errors highlighted in the form.",
+      });
     }
   };
+
+  if (isLoading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="100vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (!form) {
     return (
@@ -201,146 +233,140 @@ const FormPreviewPage: React.FC = () => {
     );
   }
 
-  // --- Render Logic ---
   const renderField = (field: FormField) => {
     const value = formData[field.id];
     const error = formErrors[field.id];
+    const commonProps = {
+      value: value || "",
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+        handleInputChange(field.id, e.target.value),
+      disabled: field.isDerived,
+      fullWidth: true,
+      variant: "outlined" as const,
+    };
 
-    // FIX: Removed redundant label for checkbox type as FormControlLabel handles it.
-    const showMainLabel = field.type !== "checkbox";
+    let inputElement;
+    switch (field.type) {
+      case "text":
+      case "number":
+        inputElement = <TextField type={field.type} {...commonProps} />;
+        break;
+      case "date":
+        inputElement = (
+          <TextField
+            type="date"
+            InputLabelProps={{ shrink: true }}
+            {...commonProps}
+          />
+        );
+        break;
+      case "textarea":
+        inputElement = <TextField multiline rows={4} {...commonProps} />;
+        break;
+      case "select":
+        inputElement = (
+          <FormControl fullWidth>
+            <InputLabel>{field.label}</InputLabel>
+            <Select
+              value={value || ""}
+              onChange={(e) => handleInputChange(field.id, e.target.value)}
+              disabled={field.isDerived}
+            >
+              {field.options?.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        );
+        break;
+      case "radio":
+        inputElement = (
+          <RadioGroup
+            value={value || ""}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+          >
+            {field.options?.map((option) => (
+              <FormControlLabel
+                key={option}
+                value={option}
+                control={<Radio disabled={field.isDerived} />}
+                label={option}
+              />
+            ))}
+          </RadioGroup>
+        );
+        break;
+      case "checkbox":
+        inputElement = (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={!!value}
+                onChange={(e) => handleInputChange(field.id, e.target.checked)}
+                disabled={field.isDerived}
+              />
+            }
+            label={field.label}
+          />
+        );
+        break;
+    }
 
     return (
-      <FormControl
-        key={field.id}
-        fullWidth
-        margin="normal"
-        error={!!error}
-        sx={{ mb: 3 }}
-      >
-        {showMainLabel && (
-          <Typography variant="subtitle1" component="label" sx={{ mb: 1 }}>
-            {field.label}{" "}
-            {field.required && <span style={{ color: "red" }}>*</span>}
-          </Typography>
-        )}
-
-        {(() => {
-          switch (field.type) {
-            case "text":
-            case "number":
-            case "date": // Date can also use TextField
-              return (
-                <TextField
-                  type={field.type}
-                  value={value || ""}
-                  onChange={(e) => handleInputChange(field.id, e.target.value)}
-                  disabled={field.isDerived}
-                  InputLabelProps={
-                    field.type === "date" ? { shrink: true } : undefined
-                  }
-                />
-              );
-            case "textarea":
-              return (
-                <TextField
-                  multiline
-                  rows={4}
-                  value={value || ""}
-                  onChange={(e) => handleInputChange(field.id, e.target.value)}
-                  disabled={field.isDerived}
-                />
-              );
-            case "select":
-              // FIX: Correct MUI pattern for Select with a floating label.
-              // The InputLabel is now inside the FormControl but the label prop is used.
-              return (
-                <>
-                  <InputLabel id={`${field.id}-label`}>
-                    {field.label}
-                  </InputLabel>
-                  <Select
-                    labelId={`${field.id}-label`}
-                    value={value || ""}
-                    label={field.label} // This is crucial for the floating label animation
-                    onChange={(e) =>
-                      handleInputChange(field.id, e.target.value)
-                    }
-                    disabled={field.isDerived}
-                  >
-                    {field.options?.map((option: string) => (
-                      <MenuItem key={option} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </>
-              );
-            case "radio":
-              return (
-                <RadioGroup
-                  value={value || ""}
-                  onChange={(e) => handleInputChange(field.id, e.target.value)}
-                >
-                  {field.options?.map((option: string) => (
-                    <FormControlLabel
-                      key={option}
-                      value={option}
-                      control={<Radio disabled={field.isDerived} />}
-                      label={option}
-                    />
-                  ))}
-                </RadioGroup>
-              );
-            case "checkbox":
-              return (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={!!value}
-                      onChange={(e) =>
-                        handleInputChange(field.id, e.target.checked)
-                      }
-                      disabled={field.isDerived}
-                    />
-                  }
-                  label={
-                    <>
-                      {field.label}{" "}
-                      {field.required && (
-                        <span style={{ color: "red" }}>*</span>
-                      )}
-                    </>
-                  }
-                />
-              );
-            default:
-              return null;
-          }
-        })()}
-        {error && <FormHelperText>{error}</FormHelperText>}
-      </FormControl>
+      <Box key={field.id} sx={{ mb: 3 }}>
+        {field.type !== "select" &&
+          field.type !== "checkbox" &&
+          field.type !== "radio" && (
+            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 500 }}>
+              {field.required && <span className="required-asterisk">*</span>}
+              {field.required && <span className="required-asterisk">*</span>}
+            </Typography>
+          )}
+        {inputElement}
+        {error && <FormHelperText error>{error}</FormHelperText>}
+        <Divider sx={{ mt: 2 }} />
+      </Box>
     );
   };
 
   return (
-    <Box
-      width="100%"
-      height="100vh"
-      sx={{ p: 3 }}
-    >
-      <Typography variant="h4" gutterBottom>
-        Preview: {form.name}
-      </Typography>
-      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 3 }}>
-        {form.fields.map((field: FormField) => renderField(field))}
-        <Button
-          type="submit"
-          variant="contained"
-          color="primary"
-          sx={{ mt: 3 }}
-        >
-          Submit Form
-        </Button>
+    <Box sx={{ bgcolor: "#f7f7fb", py: 4, minHeight: "100vh" }}>
+      <Box sx={{ bgcolor: "primary.main", height: "6px", mb: 3 }} />
+      <Box
+        sx={{
+          maxWidth: 640,
+          mx: "auto",
+          bgcolor: "white",
+          borderRadius: 2,
+          p: { xs: 2, sm: 4 },
+          boxShadow: 2,
+        }}
+      >
+        <Typography variant="h4" gutterBottom>
+          {form.name}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+          Please fill out the form below. Required fields are marked with (*).
+        </Typography>
+        <form onSubmit={handleSubmit} noValidate>
+          {form.fields.map((field) => renderField(field))}
+          {submissionStatus && (
+            <Alert severity={submissionStatus.type} sx={{ mb: 2 }}>
+              {submissionStatus.message}
+            </Alert>
+          )}
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            sx={{ mt: 2 }}
+          >
+            Submit
+          </Button>
+        </form>
       </Box>
     </Box>
   );

@@ -1,9 +1,10 @@
 // src/features/formBuilder/formBuilderSlice.ts
 import { createSlice } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit'; // Use type import
-import { arrayMove } from '@dnd-kit/sortable'; // Utility for reordering
-import type { FormSchema, FormField, FieldType } from '../../types'; // Use type import
-import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { arrayMove } from '@dnd-kit/sortable';
+import type { FormSchema, FormField, FieldType } from '../../types';
+import { v4 as uuidv4 } from 'uuid';
+
 
 interface FormBuilderState {
   currentForm: FormSchema;
@@ -64,12 +65,32 @@ const formBuilderSlice = createSlice({
       state.currentForm.fields = arrayMove(state.currentForm.fields, oldIndex, newIndex);
     },
     saveCurrentForm: (state) => {
-      state.savedForms.push(state.currentForm);
-      state.currentForm = createNewForm(); // Reset for a new form
-      state.selectedFieldId = null; // Deselect any field when saving
+      const existingIndex = state.savedForms.findIndex(
+        (form) => form.id === state.currentForm.id
+      );
+
+      if (existingIndex !== -1) {
+        state.savedForms[existingIndex] = state.currentForm;
+      } else {
+        state.savedForms.push(state.currentForm);
+      }
+      state.currentForm = createNewForm();
+      state.selectedFieldId = null;
     },
     loadForms: (state, action: PayloadAction<FormSchema[]>) => {
       state.savedForms = action.payload;
+    },
+    loadFormForEdit: (state, action: PayloadAction<string>) => {
+      const formToEdit = state.savedForms.find((form) => form.id === action.payload);
+      if (formToEdit) {
+        state.currentForm = formToEdit;
+      }
+    },
+    resetCurrentForm: (state) => {
+      state.currentForm = createNewForm();
+    },
+    deleteForm: (state, action: PayloadAction<string>) => {
+      state.savedForms = state.savedForms.filter((form) => form.id !== action.payload);
     },
     setSelectedField: (state, action: PayloadAction<string | null>) => { // New reducer
       state.selectedFieldId = action.payload;
@@ -77,5 +98,5 @@ const formBuilderSlice = createSlice({
   },
 });
 
-export const { setCurrentFormName, addField, deleteField, updateField, reorderFields, saveCurrentForm, loadForms, setSelectedField } = formBuilderSlice.actions;
+export const { setCurrentFormName, addField, deleteField, updateField, reorderFields, saveCurrentForm, loadForms, loadFormForEdit, resetCurrentForm, deleteForm, setSelectedField } = formBuilderSlice.actions;
 export default formBuilderSlice.reducer;
